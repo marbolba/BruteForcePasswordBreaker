@@ -7,22 +7,28 @@ Breaker::Breaker(Service thisService)
     _foundPassword="";
     _tryPass="";
     nr_threads = thread::hardware_concurrency();
-    threadsArray=new thread[nr_threads];
 }
 Breaker::~Breaker()
 {
+    if(threadsArray!=NULL)
     delete [] threadsArray;
 }
-bool Breaker::getAllPossibilities(string prefix,int lenRemaining)
+void Breaker::setMaxPasswordLength(int len){this->maxStrLen=len;}
+inline bool Breaker::getAllPossibilities(string prefix,int lenRemaining)
 {
-    //cout<<prefix<<", ";
-    if(_service.auth(prefix))
-    {
-        cout<<"found pass: "<<prefix<<endl;
-        _foundPassword=prefix;
-        //killAllThreads();
+    if(_isFound)                                    //optimalization #3
         return true;
-    }
+
+    if(lenRemaining<(maxStrLen-alreadyTested))      //optimalization #2
+        if(_service.auth(prefix))
+        {
+            _isFound=true;
+            _foundPassword=prefix;
+            try{
+            killAllThreads();
+            }catch(...){}
+            return true;
+        }
 
     if(lenRemaining==0)
     {
@@ -34,28 +40,24 @@ bool Breaker::getAllPossibilities(string prefix,int lenRemaining)
         if(getAllPossibilities(prefix+_signsTable[i],lenRemaining-1))
             return true;
     }
+    return false;
 }
 void Breaker::killAllThreads()
 {
-    threadsArray[0].detach();
-    threadsArray[1].detach();
-    threadsArray[2].detach();
-    threadsArray[3].detach();
-    threadsArray[4].detach();
-    threadsArray[5].detach();
-    threadsArray[6].detach();
-    threadsArray[7].detach();
+    {
+        for(int i=0;i<nr_threads;i++)
+            threadsArray[i].detach();
+    }
+    //for(int i=0;i<1000;i++){cout<<".";}
+    delete []threadsArray;
+    //threadsArray=NULL;
+    cout<<"koniec"<<endl;
 }
-void Breaker::startBreaking()
+bool Breaker::breakingProcedure()
 {
-    int maxStrLen=5;
+    threadsArray=new thread[nr_threads];    //init table each time
 
-
-    //int nr_threads = thread::hardware_concurrency();
-    //thread threadsArray[nr_threads];
-	cout<<"breaking using "<<nr_threads<<" threads..."<<endl;
-
-
+    cout<<"breaking using "<<nr_threads<<" threads..."<<endl;
     for(int i=0;i<_signsNumber;i++)
     {
         string tmp;tmp.push_back(_signsTable[i]);
@@ -64,16 +66,44 @@ void Breaker::startBreaking()
 
         threadsArray[thr_nr]=thread(&Breaker::getAllPossibilities,this,tmp,maxStrLen-1);
 
-        if(thr_nr==7)
-        {
-            threadsArray[0].join();
-            threadsArray[1].join();
-            threadsArray[2].join();
-            threadsArray[3].join();
-            threadsArray[4].join();
-            threadsArray[5].join();
-            threadsArray[6].join();
-            threadsArray[7].join();
-        }
+        try{
+            if(thr_nr==nr_threads-1)
+            {
+                for(int i=0;i<nr_threads;i++)
+                    if(!_isFound)
+                        threadsArray[i].join();
+            }
+        }catch(...){}
+        if(!_foundPassword.empty())
+            break;
+    }
+    if(!_foundPassword.empty())
+    {
+        end_time=time(NULL);
+        cout<<"***END BREAKING*** in time: "<<end_time-start_time<<"(s)"<<endl;
+        return true;
+    }
+    else
+    {
+        cout<<"***INTERATE LETTER***"<<endl;
+        try{
+        killAllThreads();
+        }catch(...){}
+        return false;
+    }
+}
+void Breaker::startBreaking()
+{
+    start_time=time(NULL);
+	if(breakingProcedure())    //default for passwords of length 5
+        return;
+
+    maxStrLen++;
+    for(maxStrLen;maxStrLen<10;maxStrLen++)         //10 is max letters to check!
+    {
+        alreadyTested=maxStrLen-1;
+        cout<<"maxStrLen="<<maxStrLen<<", alreadyTested="<<alreadyTested<<endl;
+        if(breakingProcedure())
+            return;
     }
 }

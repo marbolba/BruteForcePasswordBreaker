@@ -16,6 +16,7 @@ int main()
     service.setPassword(pass);
 //setting and starting breakers
     Breaker passwordBreaker(service);
+    //passwordBreaker.setMaxPasswordLength(5);
     passwordBreaker.startBreaking();
     cout<<"Znalezione haslo to: "<<passwordBreaker.getFoundPassword()<<endl;
 

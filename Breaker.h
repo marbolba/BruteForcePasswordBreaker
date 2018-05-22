@@ -6,12 +6,16 @@
 #include <thread>
 #include <vector>
 #include <mutex>
+#include <time.h>
 
 using namespace std;
 
 class Breaker
 {
 private:
+    int maxStrLen=5;        //default password length
+    int alreadyTested=0;
+
     bool _isFound;
     string _foundPassword;
     string _tryPass;
@@ -23,12 +27,17 @@ private:
     int nr_threads;
     thread* threadsArray;
 
+    time_t start_time;
+    time_t end_time;
 
-    bool getAllPossibilities(string prefix,int lenRemaining);
+
+    inline bool getAllPossibilities(string prefix,int lenRemaining);//optimalization #1
     void killAllThreads();
+    bool breakingProcedure();
 public:
     Breaker(Service thisService);
     ~Breaker();
     void startBreaking();
+    void setMaxPasswordLength(int);
     string getFoundPassword(){return _foundPassword;}
 };
